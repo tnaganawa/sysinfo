@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/zcalusic/sysinfo"
+	"github.com/pupapaik/sysinfo"
 )
 
 func Example() {
