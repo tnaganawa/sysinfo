@@ -13,7 +13,7 @@ import (
 	"log"
 	"os/user"
 
-	"github.com/zcalusic/sysinfo"
+	"github.com/pupapaik/sysinfo"
 )
 
 func main() {

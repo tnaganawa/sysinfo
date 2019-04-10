@@ -1,3 +1,3 @@
-module github.com/zcalusic/sysinfo
+module github.com/pupapaik/sysinfo
 
 go 1.17
