@@ -6,6 +6,7 @@ package sysinfo
 
 import (
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -15,11 +16,12 @@ import (
 
 // NetworkDevice information.
 type NetworkDevice struct {
-	Name       string `json:"name,omitempty"`
-	Driver     string `json:"driver,omitempty"`
-	MACAddress string `json:"macaddress,omitempty"`
-	Port       string `json:"port,omitempty"`
-	Speed      uint   `json:"speed,omitempty"` // device max supported speed in Mbps
+	Name        string   `json:"name,omitempty"`
+	Driver      string   `json:"driver,omitempty"`
+	IpAddresses []string `json:"ip_address,omitempty"`
+	MACAddress  string   `json:"mac_address,omitempty"`
+	Port        string   `json:"port,omitempty"`
+	Speed       uint     `json:"speed,omitempty"` // device max supported speed in Mbps
 }
 
 func getPortType(supp uint32) (port string) {
@@ -104,22 +106,33 @@ func (si *SysInfo) getNetworkInfo() {
 
 	for _, link := range devices {
 		fullpath := path.Join(sysClassNet, link.Name())
-		dev, err := os.Readlink(fullpath)
+		_, err := os.Readlink(fullpath)
 		if err != nil {
 			continue
 		}
 
+		/* Use virtual intefaces as well
 		if strings.HasPrefix(dev, "../../devices/virtual/") {
 			continue
 		}
+		*/
 
 		supp := getSupported(link.Name())
+		deviceAddresses := []string{}
+		byNameInterface, _ := net.InterfaceByName(link.Name())
+		if err == nil {
+			addresses, _ := byNameInterface.Addrs()
+			for _, v := range addresses {
+				deviceAddresses = append(deviceAddresses, v.String())
+			}
+		}
 
 		device := NetworkDevice{
-			Name:       link.Name(),
-			MACAddress: slurpFile(path.Join(fullpath, "address")),
-			Port:       getPortType(supp),
-			Speed:      getMaxSpeed(supp),
+			Name:        link.Name(),
+			MACAddress:  slurpFile(path.Join(fullpath, "address")),
+			Port:        getPortType(supp),
+			Speed:       getMaxSpeed(supp),
+			IpAddresses: deviceAddresses,
 		}
 
 		if driver, err := os.Readlink(path.Join(fullpath, "device", "driver")); err == nil {
