@@ -21,12 +21,23 @@ type OS struct {
 }
 
 var (
+<<<<<<< HEAD
 	rePrettyName = regexp.MustCompile(`^PRETTY_NAME=(.*)$`)
 	reID         = regexp.MustCompile(`^ID=(.*)$`)
 	reVersionID  = regexp.MustCompile(`^VERSION_ID=(.*)$`)
 	reUbuntu     = regexp.MustCompile(`[\( ]([\d\.]+)`)
 	reCentOS     = regexp.MustCompile(`^CentOS( Linux)? release ([\d\.]+) `)
 	reRedHat     = regexp.MustCompile(`[\( ]([\d\.]+)`)
+=======
+	rePrettyName    = regexp.MustCompile(`^PRETTY_NAME=(.*)$`)
+	reID            = regexp.MustCompile(`^ID=(.*)$`)
+	reVersionID     = regexp.MustCompile(`^VERSION_ID=(.*)$`)
+	reOsTreeVersion = regexp.MustCompile(`^OSTREE_VERSION=(.*)$`)
+	reUbuntu        = regexp.MustCompile(`[\( ]([\d\.]+)`)
+	reCentOS        = regexp.MustCompile(`^CentOS( Linux)? release ([\d\.]+) `)
+	reCentOS6       = regexp.MustCompile(`^CentOS release 6\.\d (.*)`)
+	reRedhat        = regexp.MustCompile(`[\( ]([\d\.]+)`)
+>>>>>>> c17dea0 (Fix OS version for CentOS Atomic)
 )
 
 func (si *SysInfo) getOSInfo() {
@@ -51,6 +62,10 @@ func (si *SysInfo) getOSInfo() {
 			si.OS.Vendor = strings.Trim(m[1], `"`)
 		} else if m := reVersionID.FindStringSubmatch(s.Text()); m != nil {
 			si.OS.Version = strings.Trim(m[1], `"`)
+		} else if m := reOsTreeVersion.FindStringSubmatch(s.Text()); m != nil {
+			// Set Version and Release same for CentOS Atomic
+			si.OS.Release = m[1]
+			si.OS.Version = m[1]
 		}
 	}
 
