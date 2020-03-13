@@ -7,6 +7,7 @@ package sysinfo
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"runtime"
@@ -29,12 +30,13 @@ var (
 	reTwoColumns = regexp.MustCompile("\t+: ")
 	reExtraSpace = regexp.MustCompile(" +")
 	reCacheSize  = regexp.MustCompile(`^(\d+) KB$`)
+	cpuInfo      = "/proc/cpuinfo"
 )
 
 func (si *SysInfo) getCPUInfo() {
 	si.CPU.Threads = uint(runtime.NumCPU())
 
-	f, err := os.Open("/proc/cpuinfo")
+	f, err := os.Open(cpuInfo)
 	if err != nil {
 		return
 	}
@@ -47,9 +49,11 @@ func (si *SysInfo) getCPUInfo() {
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
+		//log.Printf("Line: %s", s.Text())
 		if sl := reTwoColumns.Split(s.Text(), 2); sl != nil {
+			fmt.Printf("%#v\n", sl)
 			switch sl[0] {
-			case "physical id":
+			case "processor":
 				cpuID = sl[1]
 				cpu[cpuID] = true
 			case "core id":
@@ -64,6 +68,16 @@ func (si *SysInfo) getCPUInfo() {
 					// CPU model, as reported by /proc/cpuinfo, can be a bit ugly. Clean up...
 					model := reExtraSpace.ReplaceAllLiteralString(sl[1], " ")
 					si.CPU.Model = strings.Replace(model, "- ", "-", 1)
+				}
+			case "cpu MHz":
+				log.Println("Detected speed")
+				if si.CPU.Speed == uint(0) {
+					i, err := strconv.ParseFloat(sl[1], 32)
+					log.Println(i, err)
+					if err == nil {
+						si.CPU.Speed = uint(i)
+						log.Println("SPEED", i)
+					}
 				}
 			case "cache size":
 				if si.CPU.Cache == 0 {
