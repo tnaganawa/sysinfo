@@ -29,12 +29,13 @@ var (
 	reTwoColumns = regexp.MustCompile("\t+: ")
 	reExtraSpace = regexp.MustCompile(" +")
 	reCacheSize  = regexp.MustCompile(`^(\d+) KB$`)
+	cpuInfo      = "/proc/cpuinfo"
 )
 
 func (si *SysInfo) getCPUInfo() {
 	si.CPU.Threads = uint(runtime.NumCPU())
 
-	f, err := os.Open("/proc/cpuinfo")
+	f, err := os.Open(cpuInfo)
 	if err != nil {
 		return
 	}
@@ -43,18 +44,31 @@ func (si *SysInfo) getCPUInfo() {
 	cpu := make(map[string]bool)
 	core := make(map[string]bool)
 
+	// for virtualized environment
+	cpuCount := 0
+	coreCount := 0
+
 	var cpuID string
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
+		//log.Printf("Line: %s", s.Text())
 		if sl := reTwoColumns.Split(s.Text(), 2); sl != nil {
 			switch sl[0] {
-			case "physical id":
+			case "processor":
 				cpuID = sl[1]
 				cpu[cpuID] = true
+
+				cpuCount += 1
 			case "core id":
 				coreID := fmt.Sprintf("%s/%s", cpuID, sl[1])
 				core[coreID] = true
+			case "cpu cores":
+				c, err := strconv.ParseInt(sl[1], 10, 8)
+				if err == nil {
+					coreCount += int(c)
+				}
+				coreCount += 1
 			case "vendor_id":
 				if si.CPU.Vendor == "" {
 					si.CPU.Vendor = sl[1]
@@ -64,6 +78,13 @@ func (si *SysInfo) getCPUInfo() {
 					// CPU model, as reported by /proc/cpuinfo, can be a bit ugly. Clean up...
 					model := reExtraSpace.ReplaceAllLiteralString(sl[1], " ")
 					si.CPU.Model = strings.Replace(model, "- ", "-", 1)
+				}
+			case "cpu MHz":
+				if si.CPU.Speed == uint(0) {
+					i, err := strconv.ParseFloat(sl[1], 32)
+					if err == nil {
+						si.CPU.Speed = uint(i)
+					}
 				}
 			case "cache size":
 				if si.CPU.Cache == 0 {
@@ -83,7 +104,9 @@ func (si *SysInfo) getCPUInfo() {
 	// getNodeInfo() must have run first, to detect if we're dealing with a virtualized CPU! Detecting number of
 	// physical processors and/or cores is totally unreliable in virtualized environments, so let's not do it.
 	if si.Node.Hostname == "" || si.Node.Hypervisor != "" {
-		return
+		// fallback to counts when virtualized
+		si.CPU.Cpus = uint(cpuCount)
+		si.CPU.Cores = uint(coreCount)
 	}
 
 	si.CPU.Cpus = uint(len(cpu))
