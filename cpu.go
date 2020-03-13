@@ -7,7 +7,6 @@ package sysinfo
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"runtime"
@@ -45,20 +44,31 @@ func (si *SysInfo) getCPUInfo() {
 	cpu := make(map[string]bool)
 	core := make(map[string]bool)
 
+	// for virtualized environment
+	cpuCount := 0
+	coreCount := 0
+
 	var cpuID string
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		//log.Printf("Line: %s", s.Text())
 		if sl := reTwoColumns.Split(s.Text(), 2); sl != nil {
-			fmt.Printf("%#v\n", sl)
 			switch sl[0] {
 			case "processor":
 				cpuID = sl[1]
 				cpu[cpuID] = true
+
+				cpuCount += 1
 			case "core id":
 				coreID := fmt.Sprintf("%s/%s", cpuID, sl[1])
 				core[coreID] = true
+			case "cpu cores":
+				c, err := strconv.ParseInt(sl[1], 10, 8)
+				if err == nil {
+					coreCount += int(c)
+				}
+				coreCount += 1
 			case "vendor_id":
 				if si.CPU.Vendor == "" {
 					si.CPU.Vendor = sl[1]
@@ -70,13 +80,10 @@ func (si *SysInfo) getCPUInfo() {
 					si.CPU.Model = strings.Replace(model, "- ", "-", 1)
 				}
 			case "cpu MHz":
-				log.Println("Detected speed")
 				if si.CPU.Speed == uint(0) {
 					i, err := strconv.ParseFloat(sl[1], 32)
-					log.Println(i, err)
 					if err == nil {
 						si.CPU.Speed = uint(i)
-						log.Println("SPEED", i)
 					}
 				}
 			case "cache size":
@@ -97,7 +104,9 @@ func (si *SysInfo) getCPUInfo() {
 	// getNodeInfo() must have run first, to detect if we're dealing with a virtualized CPU! Detecting number of
 	// physical processors and/or cores is totally unreliable in virtualized environments, so let's not do it.
 	if si.Node.Hostname == "" || si.Node.Hypervisor != "" {
-		return
+		// fallback to counts when virtualized
+		si.CPU.Cpus = uint(cpuCount)
+		si.CPU.Cores = uint(coreCount)
 	}
 
 	si.CPU.Cpus = uint(len(cpu))
