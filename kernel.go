@@ -14,6 +14,7 @@ type Kernel struct {
 func (si *SysInfo) getKernelInfo() {
 	si.Kernel.Release = slurpFile("/proc/sys/kernel/osrelease")
 	si.Kernel.Version = slurpFile("/proc/sys/kernel/version")
+	si.Kernel.Architecture = "x86_64"
 
 	/*
 		var uname syscall.Utsname
