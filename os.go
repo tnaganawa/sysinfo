@@ -21,14 +21,6 @@ type OS struct {
 }
 
 var (
-<<<<<<< HEAD
-	rePrettyName = regexp.MustCompile(`^PRETTY_NAME=(.*)$`)
-	reID         = regexp.MustCompile(`^ID=(.*)$`)
-	reVersionID  = regexp.MustCompile(`^VERSION_ID=(.*)$`)
-	reUbuntu     = regexp.MustCompile(`[\( ]([\d\.]+)`)
-	reCentOS     = regexp.MustCompile(`^CentOS( Linux)? release ([\d\.]+) `)
-	reRedHat     = regexp.MustCompile(`[\( ]([\d\.]+)`)
-=======
 	rePrettyName    = regexp.MustCompile(`^PRETTY_NAME=(.*)$`)
 	reID            = regexp.MustCompile(`^ID=(.*)$`)
 	reVersionID     = regexp.MustCompile(`^VERSION_ID=(.*)$`)
@@ -37,7 +29,6 @@ var (
 	reCentOS        = regexp.MustCompile(`^CentOS( Linux)? release ([\d\.]+) `)
 	reCentOS6       = regexp.MustCompile(`^CentOS release 6\.\d (.*)`)
 	reRedhat        = regexp.MustCompile(`[\( ]([\d\.]+)`)
->>>>>>> c17dea0 (Fix OS version for CentOS Atomic)
 )
 
 func (si *SysInfo) getOSInfo() {
