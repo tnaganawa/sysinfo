@@ -72,7 +72,7 @@ func (si *SysInfo) getSetMachineID() {
 	spewFile(pathDbusMachineID, newMachineID, 0444)
 	si.Node.MachineID = newMachineID
 
-	os.Exit(0)
+	return
 }
 
 func (si *SysInfo) getTimezone() {
