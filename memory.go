@@ -123,6 +123,48 @@ func getStructureTableAddress(f *os.File) (address int64, length int, err error)
 	return 0, 0, ErrNotExist
 }
 
+func parseProcMeminfo() (map[string]uint64, error) {
+	m := make(map[string]uint64)
+
+	memfile, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return nil, err
+	}
+	defer memfile.Close()
+
+	scanner := bufio.NewScanner(memfile)
+	for scanner.Scan() {
+		text := scanner.Text()
+
+		n := strings.Index(text, ":")
+		if n == -1 {
+			continue
+		}
+
+		key := text[:n]
+		data := strings.Split(strings.Trim(text[(n+1):], " "), " ")
+
+		if len(data) == 1 {
+			value, err := strconv.ParseUint(data[0], 10, 64)
+			if err != nil {
+				continue
+			}
+			m[key] = value
+
+		} else if len(data) == 2 {
+			if data[1] == "kB" {
+				value, err := strconv.ParseUint(data[0], 10, 64)
+				if err != nil {
+					continue
+				}
+				m[key] = value
+			}
+		}
+	}
+	return m, err
+
+}
+
 func getStructureTable() ([]byte, error) {
 	f, err := os.Open("/dev/mem")
 	if err != nil {
@@ -238,4 +280,20 @@ loop:
 		si.Memory.Type = "DRAM"
 		si.Memory.Size = memSizeAlt
 	}
+
+	// WA for AWS VMs
+	output, err := ioutil.ReadFile("/sys/devices/virtual/dmi/id/product_uuid")
+	if err != nil {
+		return
+	}
+	if strings.HasPrefix(string(output), "ec2") {
+		procmem, err := parseProcMeminfo()
+		if err != nil {
+			return
+		}
+		mem := procmem["MemTotal"]
+		si.Memory.Type = "Other"
+		si.Memory.Size = uint(mem / 1024)
+	}
+
 }
