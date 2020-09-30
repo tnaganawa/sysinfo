@@ -5,10 +5,14 @@
 package sysinfo
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"io/ioutil"
+	"os"
 	"strconv"
+	"strings"
+	"syscall"
 )
 
 // Memory information.
@@ -28,6 +32,159 @@ func dword(data []byte, index int) uint32 {
 
 func qword(data []byte, index int) uint64 {
 	return binary.LittleEndian.Uint64(data[index : index+8])
+}
+
+func epsChecksum(sl []byte) (sum byte) {
+	for _, v := range sl {
+		sum += v
+	}
+
+	return
+}
+
+func epsValid(eps []byte) bool {
+	if epsChecksum(eps) == 0 && bytes.Equal(eps[0x10:0x15], []byte("_DMI_")) && epsChecksum(eps[0x10:]) == 0 {
+		return true
+	}
+
+	return false
+}
+
+func getStructureTableAddressEFI(f *os.File) (address int64, length int, err error) {
+	systab, err := os.Open("/sys/firmware/efi/systab")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer systab.Close()
+
+	s := bufio.NewScanner(systab)
+	for s.Scan() {
+		sl := strings.Split(s.Text(), "=")
+		if len(sl) != 2 || sl[0] != "SMBIOS" {
+			continue
+		}
+
+		addr, err := strconv.ParseInt(sl[1], 0, 64)
+		if err != nil {
+			return 0, 0, err
+		}
+
+		eps, err := syscall.Mmap(int(f.Fd()), addr, epsSize, syscall.PROT_READ, syscall.MAP_SHARED)
+		if err != nil {
+			return 0, 0, err
+		}
+		defer syscall.Munmap(eps)
+
+		if !epsValid(eps) {
+			break
+		}
+
+		return int64(dword(eps, 0x18)), int(word(eps, 0x16)), nil
+	}
+	if err := s.Err(); err != nil {
+		return 0, 0, err
+	}
+
+	return 0, 0, ErrNotExist
+}
+
+func getStructureTableAddress(f *os.File) (address int64, length int, err error) {
+	// SMBIOS Reference Specification Version 3.0.0, page 21
+	mem, err := syscall.Mmap(int(f.Fd()), 0xf0000, 0x10000, syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer syscall.Munmap(mem)
+
+	for i := range mem {
+		if i > len(mem)-epsSize {
+			break
+		}
+
+		// Search for the anchor string on paragraph (16 byte) boundaries.
+		if i%16 != 0 || !bytes.Equal(mem[i:i+4], []byte("_SM_")) {
+			continue
+		}
+
+		eps := mem[i : i+epsSize]
+		if !epsValid(eps) {
+			continue
+		}
+
+		return int64(dword(eps, 0x18)), int(word(eps, 0x16)), nil
+	}
+
+	return 0, 0, ErrNotExist
+}
+
+func parseProcMeminfo() (map[string]uint64, error) {
+	m := make(map[string]uint64)
+
+	memfile, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return nil, err
+	}
+	defer memfile.Close()
+
+	scanner := bufio.NewScanner(memfile)
+	for scanner.Scan() {
+		text := scanner.Text()
+
+		n := strings.Index(text, ":")
+		if n == -1 {
+			continue
+		}
+
+		key := text[:n]
+		data := strings.Split(strings.Trim(text[(n+1):], " "), " ")
+
+		if len(data) == 1 {
+			value, err := strconv.ParseUint(data[0], 10, 64)
+			if err != nil {
+				continue
+			}
+			m[key] = value
+
+		} else if len(data) == 2 {
+			if data[1] == "kB" {
+				value, err := strconv.ParseUint(data[0], 10, 64)
+				if err != nil {
+					continue
+				}
+				m[key] = value
+			}
+		}
+	}
+	return m, err
+
+}
+
+func getStructureTable() ([]byte, error) {
+	f, err := os.Open("/dev/mem")
+	if err != nil {
+		dmi, err := ioutil.ReadFile("/sys/firmware/dmi/tables/DMI")
+		if err != nil {
+			return nil, err
+		}
+		return dmi, nil
+	}
+	defer f.Close()
+
+	address, length, err := getStructureTableAddressEFI(f)
+	if err != nil {
+		if address, length, err = getStructureTableAddress(f); err != nil {
+			return nil, err
+		}
+	}
+
+	// Mandatory page aligning for mmap() system call, lest we get EINVAL
+	align := address & (int64(os.Getpagesize()) - 1)
+	mem, err := syscall.Mmap(int(f.Fd()), address-align, length+int(align), syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		return nil, err
+	}
+
+	return mem[align:], nil
 }
 
 func (si *SysInfo) getMemoryInfo() {
@@ -118,4 +275,20 @@ loop:
 		si.Memory.Type = "DRAM"
 		si.Memory.Size = memSizeAlt
 	}
+
+	// WA for AWS VMs
+	output, err := ioutil.ReadFile("/sys/devices/virtual/dmi/id/product_uuid")
+	if err != nil {
+		return
+	}
+	if strings.HasPrefix(string(output), "ec2") {
+		procmem, err := parseProcMeminfo()
+		if err != nil {
+			return
+		}
+		mem := procmem["MemTotal"]
+		si.Memory.Type = "Other"
+		si.Memory.Size = uint(mem / 1024)
+	}
+
 }
