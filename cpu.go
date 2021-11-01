@@ -23,6 +23,8 @@ type CPU struct {
 	Cpus    uint   `json:"cpus,omitempty"`    // number of physical CPUs
 	Cores   uint   `json:"cores,omitempty"`   // number of physical CPU cores
 	Threads uint   `json:"threads,omitempty"` // number of logical (HT) CPU cores
+	Flags   string  `json:"flags,omitempty"`  // CPU flags
+
 }
 
 var (
@@ -72,6 +74,10 @@ func (si *SysInfo) getCPUInfo() {
 			case "vendor_id":
 				if si.CPU.Vendor == "" {
 					si.CPU.Vendor = sl[1]
+				}
+			case "flags":
+				if si.CPU.Flags == "" {
+					si.CPU.Flags = sl[1]
 				}
 			case "model name":
 				if si.CPU.Model == "" {
