@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -21,6 +22,11 @@ type Memory struct {
 	Speed uint   `json:"speed,omitempty"` // RAM data rate in MT/s
 	Size  uint   `json:"size,omitempty"`  // RAM size in MB
 }
+
+const epsSize = 0x1f
+
+// ErrNotExist indicates that SMBIOS entry point could not be found.
+var ErrNotExist = errors.New("SMBIOS entry point not found")
 
 func word(data []byte, index int) uint16 {
 	return binary.LittleEndian.Uint16(data[index : index+2])
