@@ -225,7 +225,7 @@ func (si *SysInfo) getNetworkInfo() {
 		var maxSpeed uint
 
 		if err != nil {
-			fmt.Printf("err, gLinkSetting, fallback to GSET, err: %s", err)
+			// fmt.Printf("err, gLinkSetting, fallback to GSET, err: %s", err)
 
 			supp := getSupported(link.Name())
 			portType = getPortType(supp)
