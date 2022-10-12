@@ -135,6 +135,7 @@ func getSupported(name string) uint32 {
 }
 
 // struct ethtool_cmd from include/uapi/linux/ethtool.h
+const EthtoolLinkModeMaskMaxKernelNu32 = 127 // SCHAR_MAX
 type ethtoolLinkSettingType struct {
 	Cmd                 uint32
 	Speed               uint32
@@ -150,6 +151,10 @@ type ethtoolLinkSettingType struct {
 	Reserved1           [3]uint32
 	Reserved            [7]uint32
 	LinkModeMasks       [0]uint32
+	linkModeData        [3 * EthtoolLinkModeMaskMaxKernelNu32]uint32
+	// __u32 map_supported[link_mode_masks_nwords];
+	// __u32 map_advertising[link_mode_masks_nwords];
+	// __u32 map_lp_advertising[link_mode_masks_nwords];
 }
 
 func getSupportedWithEthtoolGLinkSetting(name string) (*ethtoolLinkSettingType, error) {
