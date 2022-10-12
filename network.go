@@ -188,11 +188,11 @@ func getSupportedWithEthtoolGLinkSetting(name string) (*ethtoolLinkSettingType, 
 		if errno == 0 {
 			return &ethtoolLinkSetting, nil
 		} else {
-			return nil, fmt.Errorf("error: GLinkSetting err with link mode mask, %d", errno)
+			return nil, fmt.Errorf("error: GLinkSetting err with link mode mask, %#v", errno)
 		}
 
 	} else {
-		return nil, fmt.Errorf("error: GLinkSetting err, %d", errno)
+		return nil, fmt.Errorf("error: GLinkSetting err, %#v", errno)
 	}
 	/*
 	   return nil, fmt.Errorf("error: should not reach here, errno, %d", errno)
